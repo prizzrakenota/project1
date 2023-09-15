@@ -1,0 +1,55 @@
+name: Python package
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '00 06 * * *'
+jobs:
+  build:
+    runs-on:  ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-2022]
+        python-version: ['3.x']
+        architecture: [x64]
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4.4.0
+      with:
+        python-version: ${{ matrix.python-version }}
+        architecture: ${{ matrix.architecture }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+    - name: Test python
+      run: |
+        python main.py
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3.1.2
+      with:
+        name: my-artifact
+        path: text.txt
+        retention-days: 1
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: text.txt
+    - name: Result
+      if: ${{ always() }}
+      env:
+          PEER_ID: ${{ secrets.PEER_ID }}
+          VK_TOKEN: ${{ secrets.VK_TOKEN }}
+          event_name: ${{ github.event_name }}
+          runner_os: ${{ runner.os }}
+          repository_git: ${{ matrix.python-version }} 
+          job_status: ${{ job.status }}
+          architecture: ${{ matrix.architecture }}
+      run: |
+        bash vk_notification.sh "$PEER_ID" "$VK_TOKEN" "$event_name" "$runner_os" "$repository_git" "$job_status" "$architecture"
